@@ -1,0 +1,8 @@
+{
+    "guacamoleVersion": "1.5.3",
+    "name": "Invocado",
+    "namespace": "invocado",
+    "html": [
+        "index.html"
+    ]
+}
