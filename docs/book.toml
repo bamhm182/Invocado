@@ -1,0 +1,25 @@
+[book]
+authors = ["Dylan Wilson"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Invocado"
+
+[output.html]
+default-theme = "ayu"
+no-section-label = true
+git-repository-url = "https://www.github.com/bamhm182/Invocado"
+git-repository-icon = "fa-github"
+
+[output.html.fold]
+enable = true
+level = 0
+
+[output.html.playpen]
+editable = true
+copy-js = true
+line-numbers = true
+
+[preprocessor.toc]
+command = "mdbook-toc"
+renderer = ["html"]
