@@ -1,0 +1,9 @@
+.invocado-menu {
+  display: flex;
+  align-items: stretch;
+  flex-direction: row;
+}
+
+.invocado-menu .menu-title {
+  font-weight: 700;
+}

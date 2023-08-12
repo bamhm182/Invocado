@@ -2,7 +2,13 @@
     "guacamoleVersion": "1.5.3",
     "name": "Invocado",
     "namespace": "invocado",
+    "css": [
+        "theme.css"
+    ],
     "html": [
-        "index.html"
+        "menu.html"
+    ],
+    "js": [
+        "invocado.js"
     ]
 }
