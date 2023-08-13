@@ -1,3 +1,3 @@
-function test() {
-    alert("this is a test");
+function alertMe() {
+    alert(1);
 }
