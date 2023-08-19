@@ -30,47 +30,25 @@ class Db(Plugin):
     def add_mac_mapping(self, mapping) -> None:
         session = self.Session()
         q = session.query(MacMapping)
-        mapping = [
-            {
-                "position": 0,
-                "value": "00",
-                "description": "kali"
-            },
-            {
-                "position": 0,
-                "value": "01",
-                "description": "nixos"
-            },
-            {
-                "position": 1,
-                "value": "00",
-                "description": "base"
-            },
-            {
-                "position": 1,
-                "value": "01",
-                "description": "ctf"
-            },
-            {
-                "position": 4,
-                "value": "00",
-                "description": "80"
-            },
-            {
-                "position": 4,
-                "value": "01",
-                "description": "26"
-            },
-        ]
         for m in mapping:
             db_m = q.filter_by(position=m.get('position'))
-            db_m = db_m.filter_by(value=m.get('value')).first()
-            if not db_m:
+            db_m = db_m.filter_by(description=m.get('description')).first()
+            if db_m is None:
                 db_m = MacMapping()
                 session.add(db_m)
-            db_m.position = m['position']
-            db_m.value = int(m['value'], 16) if type(m['value']) == str else m['value']
-            db_m.description = m['description']
+                db_m.position = m['position']
+                db_m.description = m['description']
+                if db_m.value is None:
+                    highest = q.filter_by(position=m['position']).order_by(MacMapping.value.desc()).first()
+                    if highest.value is None:
+                        value = 0
+                    else:
+                        value = highest.value + 1
+                elif type(m['value'] == str):
+                    value = int(m['value'], 16)
+                else:
+                    value = m['value']
+                db_m.value = value
         session.commit()
         session.close()
 
@@ -145,7 +123,8 @@ class Db(Plugin):
 
         for mac in macs:
             m = self.decode_mac(mac)
-            data.append([m["mac"], m["vlan"], m["folder"]])
+            if m["folder"].exists():
+                data.append([m["mac"], m["vlan"], m["folder"]])
 
         data.sort(key=lambda x: x[0])
 
