@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nix-shell
+#!nix-shell -i bash -p unzip zip
 
 main () {
     setup
@@ -22,6 +23,7 @@ build_extension () {
 }
 
 run_guacamole () {
+    sudo chown ${USERNAME}:${USERNAME} ~/.local/share/containers/storage -R
     mkdir -p ${BUILD_DIR}/db
     podman kill invocado_guacd
     podman kill invocado_guac

@@ -6,6 +6,7 @@
         "theme.css"
     ],
     "html": [
+        "button.html",
         "menu.html"
     ],
     "js": [

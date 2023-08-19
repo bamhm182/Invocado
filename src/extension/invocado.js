@@ -1,3 +1,3 @@
-function alertMe() {
+function test() {
     alert(1);
-}
+};

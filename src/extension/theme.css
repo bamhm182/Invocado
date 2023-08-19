@@ -1,9 +1,19 @@
-.invocado-menu {
-  display: flex;
-  align-items: stretch;
-  flex-direction: row;
-}
+#invocado-menu-background {
+    display: none;
+    background: #000;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    opacity: 0.5;
+};
 
-.invocado-menu .menu-title {
-  font-weight: 700;
+#invocado-menu {
+    position: absolute;
+    width: 75%;
+    top: 25%;
+    left: 12.5%;
+    height: 50%;
+    background: #fff;
 }
