@@ -56,7 +56,7 @@ class State(object):
     @property
     def terraform_dir(self) -> pathlib.PosixPath:
         if self._terraform_dir is None:
-            self._terraform_dir = pathliab.Path('~/.config/invocado/terraform').expanduser().resolve()
+            self._terraform_dir = pathlib.Path('~/.config/invocado/terraform').expanduser().resolve()
         if self._terraform_dir:
             self._terraform_dir.mkdir(parents=True, exist_ok=True)
         return self._terraform_dir

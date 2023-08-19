@@ -29,5 +29,6 @@ setuptools.setup(
         "alembic==1.11.3",
         "pathlib2==2.3.7.post1",
         "requests==2.31.0",
+        "tabulate==0.9.0"
     ]
 )
