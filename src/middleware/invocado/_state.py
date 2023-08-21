@@ -7,7 +7,9 @@ from typing import Union
 class State(object):
     def __init__(self):
         self._config_dir = None
-        self._guacamose_host = None
+        self._guacamole_authtoken = None
+        self._guacamole_datasource = None
+        self._guacamole_url = None
         self._guacamole_password = None
         self._guacamole_username = None
         self._terraform_dir = None
@@ -30,15 +32,35 @@ class State(object):
         self._config_dir = value
 
     @property
-    def guacamole_host(self) -> str:
-        return self._guacamole_host 
+    def guacamole_authtoken(self) -> str:
+        return self._guacamole_authtoken
 
-    @guacamole_host.setter
-    def guacamole_host(self, value: str) -> None:
-        self._guacamole_host = value
+    @guacamole_authtoken.setter
+    def guacamole_authtoken(self, value: str) -> None:
+        self._guacamole_authtoken = value
+
+    @property
+    def guacamole_datasource(self) -> str:
+        return self._guacamole_datasource
+
+    @guacamole_datasource.setter
+    def guacamole_datasource(self, value: str) -> str:
+        self._guacamole_datasource = value
+
+    @property
+    def guacamole_url(self) -> str:
+        if self._guacamole_url is None:
+            self._guacamole_url = 'http://127.0.0.1:8080/guacamole/'
+        return self._guacamole_url 
+
+    @guacamole_url.setter
+    def guacamole_url(self, value: str) -> None:
+        self._guacamole_url = value
 
     @property
     def guacamole_password(self) -> str:
+        if self._guacamole_password is None:
+            self._guacamole_password = 'guacadmin'
         return self._guacamole_password 
 
     @guacamole_password.setter
@@ -47,7 +69,9 @@ class State(object):
 
     @property
     def guacamole_username(self) -> str:
-        return self._guacamole_host 
+        if self._guacamole_username is None:
+            self._guacamole_username = 'guacadmin';
+        return self._guacamole_username 
 
     @guacamole_username.setter
     def guacamole_username(self, value: str) -> None:

@@ -19,7 +19,7 @@ setup () {
 build_extension () {
     rm -r ${BUILD_DIR}/extensions
     mkdir -p ${BUILD_DIR}/extensions
-    zip -jr ${BUILD_DIR}/extensions/invocado.jar ${EXT_DIR}/*
+    #zip -jr ${BUILD_DIR}/extensions/invocado.jar ${EXT_DIR}/*
 }
 
 run_guacamole () {

@@ -1,8 +1,9 @@
 import alembic.config
 import alembic.command
-import sqlalchemy as sa
+import itertools
 import pathlib
 import re
+import sqlalchemy as sa
 
 from sqlalchemy.orm import sessionmaker
 from invocado.db.models import Config
@@ -92,39 +93,49 @@ class Db(Plugin):
             if vlan is not None:
                 vlan = vlan.description
 
-            return {
-                'mac': mac.upper(),
-                'folder': folder,
-                'vlan': vlan,
-                'instance': int(positions[instance_pos], 16)
-            }
+            instance = int(positions[instance_pos], 16)
+            vm_name = list()
+            vm_name.append(str(folder).replace(str(self.terraform_dir), ''))
+            if vlan is not None:
+                vm_name.append(f'vlan{vlan}')
+            vm_name.append(f'instance{instance}')
+            vm_name = '_'.join(vm_name)
+            vm_name = vm_name.replace('/', '_').strip('_')
 
-    def print_mac_mappings(self):
+            session.close()
+
+            if folder.exists():
+                return {
+                    'folder': folder,
+                    'instance': instance,
+                    'mac': mac.upper(),
+                    'vlan': vlan,
+                    'vm_name': vm_name
+                }
+
+    def get_mac_mappings(self):
         session = self.Session()
         query = session.query(MacMapping)
-        macs = set()
-        values = dict()
+        values = list()
 
         for i in range(6):
             maps = query.filter_by(position = i).all()
-            values[i] = [ 'FF' ] if len(maps) == 0 else [hex(m.value).upper().replace('0X', '000')[-2:] for m in maps]
+            values.append([ 'FF' ] if len(maps) == 0 else [hex(m.value).upper().replace('0X', '000')[-2:] for m in maps])
 
         session.close()
 
-        for zero in values[0]:
-            for one in values[1]:
-                for two in values[2]:
-                    for three in values[3]:
-                        for four in values[4]:
-                            for five in values[5]:
-                                macs.add(':'.join([zero, one, two, three, four, five]))
+        return set(':'.join(parts) for parts in itertools.product(*values))
 
+    def print_mac_mappings(self):
         data = list()
-
-        for mac in macs:
-            m = self.decode_mac(mac)
-            if m["folder"].exists():
-                data.append([m["mac"], m["vlan"], m["folder"]])
+        for mac in self.get_mac_mappings():
+            definition = self.decode_mac(mac)
+            if definition:
+                data.append([
+                    definition['mac'],
+                    definition['vlan'],
+                    definition['folder']
+                ])
 
         data.sort(key=lambda x: x[0])
 
@@ -140,15 +151,31 @@ class Db(Plugin):
         return getattr(config, name) if name else config
 
     @property
-    def guacamole_host(self) -> str:
-        if self.state.guacamole_host:
-            return self.get_config('guacamole_host')
-        return self.state.guacamole_host
+    def guacamole_authtoken(self) -> str:
+        return self.state.guacamole_authtoken
 
-    @guacamole_host.setter
-    def guacamole_host(self, value: str) -> None:
-        self.state.guacamole_host = value
-        self.set_config('guacamole_host', value)
+    @guacamole_authtoken.setter
+    def guacamole_authtoken(self, value) -> str:
+        self.state.guacamole_authtoken = value
+
+    @property
+    def guacamole_datasource(self) -> str:
+        return self.state.guacamole_datasource
+
+    @guacamole_datasource.setter
+    def guacamole_datasource(self, value: str) -> None:
+        self.state.guacamole_datasource = value
+
+    @property
+    def guacamole_url(self) -> str:
+        if self.state.guacamole_url is None:
+            return self.get_config('guacamole_url')
+        return self.state.guacamole_url
+
+    @guacamole_url.setter
+    def guacamole_url(self, value: str) -> None:
+        self.state.guacamole_url = value
+        self.set_config('guacamole_url', value)
 
     @property
     def guacamole_password(self) -> str:

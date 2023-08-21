@@ -19,9 +19,9 @@ depends_on = None
 def upgrade() -> None:
     op.create_table('config',
                     sa.Column('id', sa.INTEGER, primary_key=True),
-                    sa.Column('guacamole_host', sa.VARCHAR(200), server_default=''),
-                    sa.Column('guacamole_password', sa.VARCHAR(200), server_default=''),
-                    sa.Column('guacamole_username', sa.VARCHAR(200), server_default=''),
+                    sa.Column('guacamole_url', sa.VARCHAR(200), server_default='http://127.0.0.1:8080/guacamole/'),
+                    sa.Column('guacamole_password', sa.VARCHAR(200), server_default='guacadmin'),
+                    sa.Column('guacamole_username', sa.VARCHAR(200), server_default='guacadmin'),
                     sa.Column('mac_position_type_0', sa.VARCHAR(100), server_default='folder'),
                     sa.Column('mac_position_type_1', sa.VARCHAR(100), server_default='folder'),
                     sa.Column('mac_position_type_2', sa.VARCHAR(100), server_default='folder'),

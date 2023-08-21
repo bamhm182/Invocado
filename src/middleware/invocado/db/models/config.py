@@ -7,7 +7,8 @@ Base = declarative_base()
 class Config(Base):
     __tablename__ = 'config'
     id = sa.Column(sa.Integer, autoincrement=True, primary_key=True)
-    guacamole_host = sa.Column(sa.VARCHAR(200), default='')
+    guacamole_datasource = sa.Column(sa.VARCHAR(50), default='')
+    guacamole_url = sa.Column(sa.VARCHAR(200), default='http://127.0.0.1:8080/guacamole/')
     guacamole_password = sa.Column(sa.VARCHAR(200), default='')
     guacamole_username = sa.Column(sa.VARCHAR(200), default='')
     mac_position_type_0 = sa.Column(sa.VARCHAR(100), default='folder')

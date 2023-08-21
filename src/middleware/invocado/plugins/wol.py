@@ -36,7 +36,14 @@ class Wol(Plugin):
             mac = search.group(3)
             password = search.group(4)
 
-            definition = self.parse_mac(mac)
+            definition = self.db.decode_mac(mac)
+
+            if definition:
+                self.terraform.create(definition)
+                self.guacamole.update_connection(definition)
+
+
+
             if definition:
                 definition = self.tf.create(definition)
                 self.guac.update_connection(definition)
