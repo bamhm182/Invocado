@@ -1,7 +1,7 @@
 """initial revision
 
 Revision ID: f46f81da4b7a
-Revises: 
+Revises:
 Create Date: 2023-08-19 01:07:18.137609
 
 """
@@ -37,6 +37,7 @@ def upgrade() -> None:
                     sa.Column('position', sa.INTEGER, server_default=None),
                     sa.Column('value', sa.INTEGER, server_default=None),
                     sa.Column('description', sa.VARCHAR(100), server_default=''))
+
 
 def downgrade() -> None:
     op.drop_table('config')

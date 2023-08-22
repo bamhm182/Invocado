@@ -1,3 +1,8 @@
+"""_handler.py
+
+Defines the Handler class and generally sets up the project.
+"""
+
 from ._state import State
 from invocado.plugins.base import Plugin
 

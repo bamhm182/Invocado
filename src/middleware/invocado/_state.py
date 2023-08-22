@@ -1,5 +1,4 @@
 import pathlib
-import requests
 
 from typing import Union
 
@@ -7,6 +6,7 @@ from typing import Union
 class State(object):
     def __init__(self):
         self._config_dir = None
+        self._debug = None
         self._guacamole_authtoken = None
         self._guacamole_datasource = None
         self._guacamole_url = None
@@ -32,6 +32,16 @@ class State(object):
         self._config_dir = value
 
     @property
+    def debug(self) -> bool:
+        if self._debug is None:
+            self._debug = False
+        return self._debug
+
+    @debug.setter
+    def debug(self, value: bool) -> None:
+        self._debug = value
+
+    @property
     def guacamole_authtoken(self) -> str:
         return self._guacamole_authtoken
 
@@ -48,30 +58,30 @@ class State(object):
         self._guacamole_datasource = value
 
     @property
-    def guacamole_url(self) -> str:
-        if self._guacamole_url is None:
-            self._guacamole_url = 'http://127.0.0.1:8080/guacamole/'
-        return self._guacamole_url 
-
-    @guacamole_url.setter
-    def guacamole_url(self, value: str) -> None:
-        self._guacamole_url = value
-
-    @property
     def guacamole_password(self) -> str:
         if self._guacamole_password is None:
             self._guacamole_password = 'guacadmin'
-        return self._guacamole_password 
+        return self._guacamole_password
 
     @guacamole_password.setter
     def guacamole_password(self, value: str) -> None:
         self._guacamole_password = value
 
     @property
+    def guacamole_url(self) -> str:
+        if self._guacamole_url is None:
+            self._guacamole_url = 'http://127.0.0.1:8080/guacamole/'
+        return self._guacamole_url
+
+    @guacamole_url.setter
+    def guacamole_url(self, value: str) -> None:
+        self._guacamole_url = value
+
+    @property
     def guacamole_username(self) -> str:
         if self._guacamole_username is None:
-            self._guacamole_username = 'guacadmin';
-        return self._guacamole_username 
+            self._guacamole_username = 'guacadmin'
+        return self._guacamole_username
 
     @guacamole_username.setter
     def guacamole_username(self, value: str) -> None:
@@ -102,7 +112,7 @@ class State(object):
     @property
     def wol_ip(self) -> str:
         if self._wol_ip is None:
-            self._wop_ip = '127.0.0.1'
+            self._wol_ip = '127.0.0.1'
         return self._wol_ip
 
     @wol_ip.setter

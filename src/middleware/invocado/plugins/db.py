@@ -85,11 +85,11 @@ class Db(Plugin):
             folder = self.terraform_dir
 
             for folder_pos in folder_pos_list:
-                m = mappings.filter_by(position = folder_pos, value = int(positions[folder_pos], 16)).first()
+                m = mappings.filter_by(position=folder_pos, value=int(positions[folder_pos], 16)).first()
                 if m is not None:
                     folder = folder / m.description
 
-            vlan = mappings.filter_by(position = vlan_pos, value = positions[vlan_pos]).first()
+            vlan = mappings.filter_by(position=vlan_pos, value=positions[vlan_pos]).first()
             if vlan is not None:
                 vlan = vlan.description
 
@@ -113,35 +113,7 @@ class Db(Plugin):
                     'vm_name': vm_name
                 }
 
-    def get_mac_mappings(self):
-        session = self.Session()
-        query = session.query(MacMapping)
-        values = list()
-
-        for i in range(6):
-            maps = query.filter_by(position = i).all()
-            values.append([ 'FF' ] if len(maps) == 0 else [hex(m.value).upper().replace('0X', '000')[-2:] for m in maps])
-
-        session.close()
-
-        return set(':'.join(parts) for parts in itertools.product(*values))
-
-    def print_mac_mappings(self):
-        data = list()
-        for mac in self.get_mac_mappings():
-            definition = self.decode_mac(mac)
-            if definition:
-                data.append([
-                    definition['mac'],
-                    definition['vlan'],
-                    definition['folder']
-                ])
-
-        data.sort(key=lambda x: x[0])
-
-        print(tabulate(data, headers=['MAC', 'VLAN', 'TF Config']))
-
-    def get_config(self, name:str=None):
+    def get_config(self, name: str = None):
         session = self.Session()
         config = session.query(Config).filter_by(id=1).first()
         if not config:
@@ -149,6 +121,19 @@ class Db(Plugin):
             session.add(config)
         session.close()
         return getattr(config, name) if name else config
+
+    def get_mac_mappings(self):
+        session = self.Session()
+        query = session.query(MacMapping)
+        values = list()
+
+        for i in range(6):
+            maps = query.filter_by(position=i).all()
+            values.append(['FF'] if len(maps) == 0 else [hex(m.value).upper().replace('0X', '000')[-2:] for m in maps])
+
+        session.close()
+
+        return set(':'.join(parts) for parts in itertools.product(*values))
 
     @property
     def guacamole_authtoken(self) -> str:
@@ -167,17 +152,6 @@ class Db(Plugin):
         self.state.guacamole_datasource = value
 
     @property
-    def guacamole_url(self) -> str:
-        if self.state.guacamole_url is None:
-            return self.get_config('guacamole_url')
-        return self.state.guacamole_url
-
-    @guacamole_url.setter
-    def guacamole_url(self, value: str) -> None:
-        self.state.guacamole_url = value
-        self.set_config('guacamole_url', value)
-
-    @property
     def guacamole_password(self) -> str:
         if self.state.guacamole_password is None:
             return self.get_config('guacamole_password')
@@ -189,6 +163,17 @@ class Db(Plugin):
         self.set_config('guacamole_password', value)
 
     @property
+    def guacamole_url(self) -> str:
+        if self.state.guacamole_url is None:
+            return self.get_config('guacamole_url')
+        return self.state.guacamole_url
+
+    @guacamole_url.setter
+    def guacamole_url(self, value: str) -> None:
+        self.state.guacamole_url = value
+        self.set_config('guacamole_url', value)
+
+    @property
     def guacamole_username(self) -> str:
         if self.state.guacamole_username is None:
             return self.get_config('guacamole_username')
@@ -198,6 +183,21 @@ class Db(Plugin):
     def guacamole_username(self, value: str) -> None:
         self.state.guacamole_username = value
         self.set_config('guacamole_username', value)
+
+    def print_mac_mappings(self):
+        data = list()
+        for mac in self.get_mac_mappings():
+            definition = self.decode_mac(mac)
+            if definition:
+                data.append([
+                    definition['mac'],
+                    definition['vlan'],
+                    definition['folder']
+                ])
+
+        data.sort(key=lambda x: x[0])
+
+        print(tabulate(data, headers=['MAC', 'VLAN', 'TF Config']))
 
     def set_config(self, name, value):
         session = self.Session()
