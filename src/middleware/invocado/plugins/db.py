@@ -2,7 +2,6 @@ import alembic.config
 import alembic.command
 import itertools
 import pathlib
-import re
 import sqlalchemy as sa
 
 from sqlalchemy.orm import sessionmaker
@@ -52,66 +51,6 @@ class Db(Plugin):
                 db_m.value = value
         session.commit()
         session.close()
-
-    def decode_mac(self, mac):
-        mac = mac.lower()
-        if type(mac) == bytes:
-            mac = mac.decode()
-        MAC_REGEX = re.compile(r'([0-9a-fa-f]{2})')
-        positions = MAC_REGEX.findall(mac)
-
-        if len(positions) == 6:
-            session = self.Session()
-            mappings = session.query(MacMapping)
-            config = session.query(Config).filter_by(id=1).first()
-            types = {
-                0: config.mac_position_type_0,
-                1: config.mac_position_type_1,
-                2: config.mac_position_type_2,
-                3: config.mac_position_type_3,
-                4: config.mac_position_type_4,
-                5: config.mac_position_type_5
-            }
-            folder_pos_list = list()
-            for key, val in types.items():
-                if val == 'instance':
-                    instance_pos = key
-                elif val == 'vlan':
-                    vlan_pos = key
-                elif val == 'folder':
-                    folder_pos_list.append(key)
-            folder_pos_list.sort()
-
-            folder = self.terraform_dir
-
-            for folder_pos in folder_pos_list:
-                m = mappings.filter_by(position=folder_pos, value=int(positions[folder_pos], 16)).first()
-                if m is not None:
-                    folder = folder / m.description
-
-            vlan = mappings.filter_by(position=vlan_pos, value=positions[vlan_pos]).first()
-            if vlan is not None:
-                vlan = vlan.description
-
-            instance = int(positions[instance_pos], 16)
-            vm_name = list()
-            vm_name.append(str(folder).replace(str(self.terraform_dir), ''))
-            if vlan is not None:
-                vm_name.append(f'vlan{vlan}')
-            vm_name.append(f'instance{instance}')
-            vm_name = '_'.join(vm_name)
-            vm_name = vm_name.replace('/', '_').strip('_')
-
-            session.close()
-
-            if folder.exists():
-                return {
-                    'folder': folder,
-                    'instance': instance,
-                    'mac': mac.upper(),
-                    'vlan': vlan,
-                    'vm_name': vm_name
-                }
 
     def get_config(self, name: str = None):
         session = self.Session()
@@ -248,6 +187,24 @@ class Db(Plugin):
     def wol_ip(self, value: str) -> None:
         self.state.wol_ip = value
         self.set_config('wol_ip', value)
+
+    @property
+    def wol_mac_mapping(self) -> str:
+        return self.get_config('wol_mac_mapping')
+
+    @wol_mac_mapping.setter
+    def wol_mac_mapping(self, value: str) -> None:
+        value = value.upper()
+        if len(re.sub(r'[^FVI]', '', value)) != 12:
+            return
+        used = list()
+        previous = None
+        for current in value:
+            if current in used:
+                return
+            elif current != previous and previous is not None:
+                used.append(previous)
+        self.set_config('wol_mac_mapping', value)
 
     @property
     def wol_port(self) -> int:
