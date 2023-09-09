@@ -19,6 +19,7 @@ depends_on = None
 def upgrade() -> None:
     op.create_table('config',
                     sa.Column('id', sa.INTEGER, primary_key=True),
+                    sa.Column('guacamole_datasource', sa.VARCHAR(50), server_default=''),
                     sa.Column('guacamole_url', sa.VARCHAR(200), server_default='http://127.0.0.1:8080/guacamole/'),
                     sa.Column('guacamole_password', sa.VARCHAR(200), server_default='guacadmin'),
                     sa.Column('guacamole_username', sa.VARCHAR(200), server_default='guacadmin'),
@@ -27,13 +28,20 @@ def upgrade() -> None:
                     sa.Column('terraform_repo', sa.VARCHAR(300), server_default=''),
                     sa.Column('wol_ip', sa.VARCHAR(100), server_default='127.0.0.1'),
                     sa.Column('wol_port', sa.INTEGER, default=9))
-    op.create_table('mac_mapping',
+    op.create_table('tf_folder',
                     sa.Column('id', sa.INTEGER, primary_key=True),
-                    sa.Column('kind', sa.CHAR(1), server_default=None),
-                    sa.Column('value', sa.INTEGER, server_default=None),
-                    sa.Column('description', sa.VARCHAR(100), server_default=''))
+                    sa.Column('path', sa.VARCHAR(256)))
+    op.create_table('tf_instance',
+                    sa.Column('id', sa.INTEGER, primary_key=True),
+                    sa.Column('number', sa.INTEGER),
+                    sa.Column('folder', sa.INTEGER, sa.ForeignKey('tf_folder.id')))
+    op.create_table('tf_vlan',
+                    sa.Column('id', sa.INTEGER, primary_key=True),
+                    sa.Column('name', sa.VARCHAR(128)))
 
 
 def downgrade() -> None:
     op.drop_table('config')
-    op.drop_table('mac_mapping')
+    op.drop_table('tf_folder')
+    op.drop_table('tf_instance')
+    op.drop_table('tf_vlan')

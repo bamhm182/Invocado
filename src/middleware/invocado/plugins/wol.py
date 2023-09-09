@@ -11,39 +11,10 @@ from .base import Plugin
 class Wol(Plugin):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        for plugin in ['Db']:
+        for plugin in ['Db', 'Utils']:
             setattr(self,
                     plugin.lower(),
                     self.registry.get(plugin)(self.state))
-
-    def decode_mac(self, mac: str) -> dict:
-        mac = self.validate_mac(mac)
-
-        if mac:
-            definition = {
-                'mac': ':'.join([mac[i:i+2] for i in range(0, len(mac), 2)])
-            }
-
-            folder = ''
-            instance = ''
-            vlan = ''
-
-            for i, val in enumerate(self.db.wol_mac_mapping):
-                if val == 'F':
-                    folder += mac[i]
-                elif val == 'V':
-                    vlan += mac[i]
-                elif val == 'I':
-                    instance += mac[i]
-
-            if folder:
-                definition['folder'] = int(folder, 16)
-            if vlan:
-                definition['vlan'] = int(vlan, 16)
-            if instance:
-                definition['instance'] = int(instance, 16)
-
-            return definition
 
     def handle_packet(self, data: bytes) -> dict:
         if type(data) == tuple:
@@ -60,12 +31,5 @@ class Wol(Plugin):
             mac = search.group(3)
             self.debug.log('WOL Packet Recieved', mac)
 
-            definition = self.db.decode_mac(mac)
+            definition = self.utils.decode_mac(mac)
             self.debug.log('WOL MAC Decoded', definition)
-
-    def validate_mac(self, mac: str) -> str:
-        if type(mac) == bytes:
-            mac = mac.decode()
-        mac = re.sub(r'[^0-9a-fA-F]', '', mac)
-        if len(mac) == 12:
-            return mac.upper()

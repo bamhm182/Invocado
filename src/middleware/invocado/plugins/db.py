@@ -2,11 +2,11 @@ import alembic.config
 import alembic.command
 import itertools
 import pathlib
-import sqlalchemy as sa
+import re
+import sqlalchemy
 
 from sqlalchemy.orm import sessionmaker
-from invocado.db.models import Config
-from invocado.db.models import MacMapping
+from invocado.db.models import Config, TerraformFolder, TerraformVLAN
 from tabulate import tabulate
 
 from .base import Plugin
@@ -15,45 +15,42 @@ from .base import Plugin
 class Db(Plugin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sqlite_db = self.state.config_dir / 'invocado.db'
-
-        self.set_migration()
-
-        engine = sa.create_engine(f'sqlite:///{str(self.sqlite_db)}')
-        sa.event.listen(engine, 'connect', self._fk_pragma_on_connect)
-        self.Session = sessionmaker(bind=engine)
+        for plugin in ['Utils']:
+            setattr(self,
+                    plugin.lower(),
+                    self.registry.get(plugin)(self.state))
+        self.session_maker = self.establish_db()
 
     @staticmethod
     def _fk_pragma_on_connect(dbapi_con, con_record):
         dbapi_con.execute('pragma foreign_keys=ON')
 
-    def add_mac_mapping(self, mapping) -> None:
-        session = self.Session()
-        q = session.query(MacMapping)
-        for m in mapping:
-            db_m = q.filter_by(position=m.get('position'))
-            db_m = db_m.filter_by(description=m.get('description')).first()
-            if db_m is None:
-                db_m = MacMapping()
-                session.add(db_m)
-                db_m.position = m['position']
-                db_m.description = m['description']
-                if db_m.value is None:
-                    highest = q.filter_by(position=m['position']).order_by(MacMapping.value.desc()).first()
-                    if highest.value is None:
-                        value = 0
-                    else:
-                        value = highest.value + 1
-                elif type(m['value'] == str):
-                    value = int(m['value'], 16)
-                else:
-                    value = m['value']
-                db_m.value = value
+    def add_tf_folders(self, folders: list) -> None:
+        folders = self.strip_existing_tf_folders(folders)
+
+        session = self.session_maker()
+        for folder in folders:
+            db_folder = TerraformFolder(path=folder['path'])
+            session.add(db_folder)
         session.commit()
         session.close()
 
+    def establish_db(self):
+        db_folder = pathlib.Path(__file__).parent.parent / 'db'
+        sqlite_db = self.state.config_dir / 'invocado.db'
+
+        config = alembic.config.Config()
+        config.set_main_option('script_location', str(db_folder / 'alembic'))
+        config.set_main_option('version_locations', str(db_folder / 'alembic/versions'))
+        config.set_main_option('sqlalchemy.url', f'sqlite:///{str(sqlite_db)}')
+        alembic.command.upgrade(config, 'head')
+
+        engine = sqlalchemy.create_engine(f'sqlite:///{str(sqlite_db)}')
+        sqlalchemy.event.listen(engine, 'connect', self._fk_pragma_on_connect)
+        return sessionmaker(bind=engine)
+
     def get_config(self, name: str = None):
-        session = self.Session()
+        session = self.session_maker()
         config = session.query(Config).filter_by(id=1).first()
         if not config:
             config = Config()
@@ -62,17 +59,43 @@ class Db(Plugin):
         return getattr(config, name) if name else config
 
     def get_mac_mappings(self):
-        session = self.Session()
-        query = session.query(MacMapping)
-        values = list()
-
-        for i in range(6):
-            maps = query.filter_by(position=i).all()
-            values.append(['FF'] if len(maps) == 0 else [hex(m.value).upper().replace('0X', '000')[-2:] for m in maps])
+        """Returns a set of MAC Addresses which can be used with Invocado
+        """
+        session = self.session_maker()
+        if 'F' in self.wol_mac_mapping:
+            folders = session.query(TerraformFolder).all()
+        if 'V' in self.wol_mac_mapping:
+            vlans = session.query(TerraformVLAN).all()
 
         session.close()
 
-        return set(':'.join(parts) for parts in itertools.product(*values))
+        macs = list()
+
+        folders_length = self.wol_mac_mapping.count('F')
+        vlans_length = self.wol_mac_mapping.count('V')
+        instances_length = self.wol_mac_mapping.count('I')
+
+        squashed_mapping = ''.join(c for c, _ in itertools.groupby(self.wol_mac_mapping))
+        squashed_mapping = squashed_mapping.replace('F', '__FOLDER__')
+        squashed_mapping = squashed_mapping.replace('V', '__VLAN__')
+        squashed_mapping = squashed_mapping.replace('I', '__INSTANCE__')
+
+        for folder in folders:
+            for vlan in vlans:
+                folder_hex = f'000000000000{hex(folder.id).upper().strip("0X")}'[-folders_length:]
+                vlan_hex = f'000000000000{hex(vlan.id).upper().strip("0X")}'[-vlans_length:]
+                instance_hex = 'FFFFFFFFFFFF'[-instances_length:]
+                current_mac = squashed_mapping.replace('__FOLDER__', folder_hex)
+                current_mac = current_mac.replace('__VLAN__', vlan_hex)
+                current_mac = current_mac.replace('__INSTANCE__', instance_hex)
+                macs.append(current_mac)
+
+        returned_macs = set()
+
+        for mac in macs:
+            returned_macs.add(':'.join([mac[i:i+2] for i in range(0, len(mac), 2)]))
+
+        return returned_macs
 
     @property
     def guacamole_authtoken(self) -> str:
@@ -125,8 +148,10 @@ class Db(Plugin):
 
     def print_mac_mappings(self):
         data = list()
+        wol_mac_mapping = self.wol_mac_mapping
         for mac in self.get_mac_mappings():
-            definition = self.decode_mac(mac)
+            print(mac)
+            definition = self.utils.decode_mac(mac, wol_mac_mapping)
             if definition:
                 data.append([
                     definition['mac'],
@@ -139,7 +164,7 @@ class Db(Plugin):
         print(tabulate(data, headers=['MAC', 'VLAN', 'TF Config']))
 
     def set_config(self, name, value):
-        session = self.Session()
+        session = self.session_maker()
         config = session.query(Config).filter_by(id=1).first()
         if not config:
             config = Config()
@@ -148,14 +173,16 @@ class Db(Plugin):
         session.commit()
         session.close()
 
-    def set_migration(self):
-        db_folder = pathlib.Path(__file__).parent.parent / 'db'
-
-        config = alembic.config.Config()
-        config.set_main_option('script_location', str(db_folder / 'alembic'))
-        config.set_main_option('version_locations', str(db_folder / 'alembic/versions'))
-        config.set_main_option('sqlalchemy.url', f'sqlite:///{str(self.sqlite_db)}')
-        alembic.command.upgrade(config, 'head')
+    def strip_existing_tf_folders(self, folders) -> list:
+        session = self.session_maker()
+        query = session.query(TerraformFolder)
+        ret = list()
+        for folder in folders:
+            db_folder = query.filter_by(path=folder.get('path')).first()
+            if not db_folder:
+                ret.append(folder)
+        session.close()
+        return ret
 
     @property
     def terraform_dir(self) -> str:
@@ -204,6 +231,7 @@ class Db(Plugin):
                 return
             elif current != previous and previous is not None:
                 used.append(previous)
+            previous = current
         self.set_config('wol_mac_mapping', value)
 
     @property

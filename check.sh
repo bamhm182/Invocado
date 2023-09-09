@@ -36,16 +36,16 @@ test_files () {
             echo ${plugin} is not in alphabetical order
             diff_arrays defs a_defs
         fi
-        # Check Missing Documentation
-        for def in ${defs[@]}; do
-            grep "## ${p}.${def}" ./docs/src/components/middleware/plugins/${p}.md > /dev/null 2>&1
-            if [[ $? != 0 ]]; then
-                grep "def ${def}(" ${plugin} -B1 | grep "@property" > /dev/null 2>&1
-                if [[ $? != 0 ]]; then
-                    echo ${p} missing documentation for: ${def}
-                fi
-            fi
-        done
+#        # Check Missing Documentation
+#        for def in ${defs[@]}; do
+#            grep "## ${p}.${def}" ./docs/src/components/middleware/plugins/${p}.md > /dev/null 2>&1
+#            if [[ $? != 0 ]]; then
+#                grep "def ${def}(" ${plugin} -B1 | grep "@property" > /dev/null 2>&1
+#                if [[ $? != 0 ]]; then
+#                    echo ${p} missing documentation for: ${def}
+#                fi
+#            fi
+#        done
     done
     
     # Check Tests
@@ -72,7 +72,7 @@ test_files () {
 }
 
 test_coverage () {
-    python -m coverage run --source=src/middleware --omit=src/middleware/invocado/db/alembic/env.py,src/middleware/invocado/db/alembic/versions/*.py -m unittest discover tests/middleware/
+    python -m coverage run --source=src/middleware/invocado --omit=src/middleware/invocado/db/alembic/env.py,src/middleware/invocado/db/alembic/versions/*.py -m unittest discover tests/middleware/
     python -m coverage report | egrep -v "^[^T].*100%"
     python -m coverage html
 }

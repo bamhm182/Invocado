@@ -1,4 +1,6 @@
 # flake8: noqa
 
 from .config import Config
-from .mac_mapping import MacMapping
+from .tf_folder import TerraformFolder
+from .tf_instance import TerraformInstance
+from .tf_vlan import TerraformVLAN

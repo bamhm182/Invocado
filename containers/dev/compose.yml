@@ -1,0 +1,40 @@
+version: "2.7"
+services:
+  invocado_db:
+    container_name: invocado_db
+    image: mysql:8.1
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: yes
+      MYSQL_DATABASE: 'db'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'password'
+    volumes:
+      - ../../build/db/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql:ro
+    healthcheck:
+      test: mysqladmin ping -h localhost -uuser -ppassword | grep 'is alive'
+      interval: 3s
+      timeout: 5s
+      retries: 5
+  invocado_guacd:
+    container_name: invocado_guacd
+    image: guacamole/guacd
+  invocado_guac:
+    container_name: invocado_guac
+    image: guacamole/guacamole
+    environment:
+      GUACAMOLE_HOME: "/opt/guachome"
+      LOGBACK_LEVEL: "debug"
+      GUACD_HOSTNAME: "invocado_guacd"
+      MYSQL_SSL_MODE: "disabled"
+      MYSQL_HOSTNAME: "invocado_db"
+      MYSQL_DATABASE: 'db'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'password'
+    depends_on:
+      invocado_guacd:
+      invocado_db:
+        condition: service_healthy
+    volumes:
+      - ../../build:/opt/guachome:ro
+    ports:
+      - 8080:8080
