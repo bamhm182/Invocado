@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(__file__, '../../../src/middlewa
 import invocado  # noqa: E402
 
 
-class StateTestClass(unittest.TestCase):
+class UtilsTestClass(unittest.TestCase):
     def setUp(self):
         self.state = invocado._state.State()
         self.utils = invocado.plugins.Utils(self.state)

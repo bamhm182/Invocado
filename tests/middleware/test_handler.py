@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(__file__, '../../../src/middlewa
 import invocado  # noqa: E402
 
 
-class StateTestClass(unittest.TestCase):
+class HandlerTestClass(unittest.TestCase):
     def setUp(self):
         for plugin in invocado.plugins.base.Plugin.registry.keys():
             invocado.plugins.base.Plugin.registry[plugin] = MagicMock()

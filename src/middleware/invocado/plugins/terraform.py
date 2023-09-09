@@ -32,6 +32,7 @@ class Terraform(Plugin):
     def clone_repo(self, reset: bool = True) -> None:
         if self.db.terraform_repo in [None, '']:
             self.db.terraform_repo = input("Terraform Repo URL: ")
+
         try:
             repo = git.Repo(self.db.terraform_dir)
         except (git.exc.NoSuchPathError, git.exc.InvalidGitRepositoryError):
@@ -39,7 +40,7 @@ class Terraform(Plugin):
 
         if not hasattr(repo.remotes, 'origin') or self.db.terraform_repo not in repo.remotes.origin.urls:
             shutil.rmtree(self.db.terraform_dir)
-            self.clone_repo()
+            return self.clone_repo()
 
         if reset:
             repo.git.reset('--hard')
