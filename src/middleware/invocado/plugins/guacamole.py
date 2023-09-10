@@ -28,9 +28,6 @@ class Guacamole(Plugin):
         elif ret.status_code == 403:
             self.debug.log('Authentication Failure', 'Invocado failed to log in with provided credentials')
 
-    def find_connection(self, **kwargs):
-        pass
-
     def get_connection_parameters(self, connection):
         ret = self.request(f'session/data/{self.state.guacamole_datasource}/connections/{connection}/parameters')
         if ret.status_code == 200:

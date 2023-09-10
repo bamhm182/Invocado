@@ -69,3 +69,14 @@ class GuacamoleTestClass(unittest.TestCase):
         mock_json_loads.return_value = 'json_ret'
         self.assertEqual('json_ret', self.guacamole.get_connections())
         self.guacamole.request.assert_called_with('session/data/pizza/connections')
+
+    def test_request(self):
+        self.guacamole.session.request.return_value.status_code = 200
+        self.guacamole.session.request.return_value.content = b'Something something dark side'
+        self.guacamole.db.guacamole_url = 'http://guac/'
+        self.assertEqual(self.guacamole.session.request.return_value,
+                         self.real_guacamole_request(self.guacamole, 'my_endpoint'))
+        self.guacamole.session.request.assert_called_with('GET', 'http://guac/api/my_endpoint')
+        self.guacamole.debug.log.assert_called_with('Guacamole API Call',
+                                                    '200 -- GET -- http://guac/api/my_endpoint' +
+                                                    '\n\tContent: Something something dark side')
