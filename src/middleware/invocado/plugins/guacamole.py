@@ -12,7 +12,7 @@ class Guacamole(Plugin):
                     plugin.lower(),
                     self.registry.get(plugin)(self.state))
 
-        self.session = requests.session()
+        self.session = kwargs.get('session', requests.session)()
 
     def authenticate(self):
         data = {

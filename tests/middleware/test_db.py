@@ -18,11 +18,9 @@ import invocado  # noqa: E402
 class DbTestClass(unittest.TestCase):
     def setUp(self):
         self.state = invocado._state.State()
-        self.db = invocado.plugins.Db(self.state)
+        self.db = invocado.plugins.Db(self.state, establish_db=MagicMock())
         self.db.utils = MagicMock()
-        self.real_establish_db = self.db.establish_db
-        self.db.establish_db = MagicMock()
-        self.db.session_maker = MagicMock()
+        self.real_establish_db = invocado.plugins.db.Db.establish_db
 
     def test_add_tf_folders(self):
         self.db.strip_existing_tf_folders = MagicMock()
@@ -45,7 +43,7 @@ class DbTestClass(unittest.TestCase):
     @patch('pathlib.Path', return_value=pathlib.Path('/tmp/one/two'))
     def test_establish_db(self, mock_path, mock_event, mock_create_engine, mock_command, mock_config):
         self.state.config_dir = '/tmp'
-        self.real_establish_db()
+        self.real_establish_db(self.db)
         mock_config.assert_called_with()
         mock_config.return_value.set_main_option.assert_has_calls([
             call('script_location', '/tmp/db/alembic'),
@@ -106,23 +104,46 @@ class DbTestClass(unittest.TestCase):
             db_vlans,
         ]
 
-        expected_outcomes = [
-            '00:00:00:00:FF:FF',
-            '00:00:47:62:FF:FF',
-            '00:01:00:00:FF:FF',
-            '00:01:47:62:FF:FF',
-            '00:02:00:00:FF:FF',
-            '00:02:47:62:FF:FF',
-            '28:23:00:00:FF:FF',
-            '28:23:47:62:FF:FF',
-        ]
+        expected_outcome = {
+            'macs': [
+                '00:00:00:00:FF:FF',
+                '00:00:47:62:FF:FF',
+                '00:01:00:00:FF:FF',
+                '00:01:47:62:FF:FF',
+                '00:02:00:00:FF:FF',
+                '00:02:47:62:FF:FF',
+                '28:23:00:00:FF:FF',
+                '28:23:47:62:FF:FF',
+            ],
+            'folders': {
+                0: 'one',
+                1: 'two',
+                2: 'three/one',
+                10275: 'three/two',
+            },
+            'vlans': {
+                0: 'myVLAN',
+                18274: 'myOtherVLAN',
+            },
+        }
 
-        actual_outcomes = self.db.get_mac_mappings()
+        actual_outcome = self.db.get_mac_mappings()
 
-        self.assertEqual(len(expected_outcomes), len(actual_outcomes))
+        self.assertEqual(len(expected_outcome), len(actual_outcome))
+        self.assertEqual(len(expected_outcome.get('macs')), len(actual_outcome.get('macs')))
+        self.assertEqual(len(expected_outcome.get('folders')), len(actual_outcome.get('folders')))
+        self.assertEqual(len(expected_outcome.get('vlans')), len(actual_outcome.get('vlans')))
 
-        for outcome in expected_outcomes:
-            self.assertTrue(outcome in actual_outcomes)
+        for category in expected_outcome.keys():
+            self.assertTrue(category in actual_outcome.keys())
+            if type(expected_outcome.get(category)) == list:
+                for item in expected_outcome.get(category):
+                    self.assertTrue(item in actual_outcome.get(category))
+            elif type(expected_outcome.get(category)) == dict:
+                for key in expected_outcome.get(category, dict()).keys():
+                    self.assertTrue(key in actual_outcome.get(category, dict()).keys())
+                    self.assertEqual(expected_outcome.get(category, dict()).get(key),
+                                     actual_outcome.get(category, dict()).get(key))
 
         self.db.session_maker.assert_called_with()
         query.assert_has_calls([
@@ -151,19 +172,162 @@ class DbTestClass(unittest.TestCase):
             db_vlans,
         ]
 
-        expected_outcomes = [
-            '00:00:00:00:00:FF',
-            '43:00:00:00:00:FF',
-            '00:2B:8A:3F:08:FF',
-            '43:2B:8A:3F:08:FF',
+        expected_outcome = {
+            'macs': [
+                '00:00:00:00:00:FF',
+                '43:00:00:00:00:FF',
+                '00:2B:8A:3F:08:FF',
+                '43:2B:8A:3F:08:FF',
+            ],
+            'folders': {
+                0: 'one',
+                730480392: 'two',
+            },
+            'vlans': {
+                0: 'myVLAN',
+                67: 'myOtherVLAN',
+            }
+        }
+
+        actual_outcome = self.db.get_mac_mappings()
+
+        self.assertEqual(len(expected_outcome), len(actual_outcome))
+        self.assertEqual(len(expected_outcome.get('macs')), len(actual_outcome.get('macs')))
+        self.assertEqual(len(expected_outcome.get('folders')), len(actual_outcome.get('folders')))
+        self.assertEqual(len(expected_outcome.get('vlans')), len(actual_outcome.get('vlans')))
+
+        for category in expected_outcome.keys():
+            self.assertTrue(category in actual_outcome.keys())
+            if type(expected_outcome.get(category)) == list:
+                for item in expected_outcome.get(category):
+                    self.assertTrue(item in actual_outcome.get(category))
+            elif type(expected_outcome.get(category)) == dict:
+                for key in expected_outcome.get(category, dict()).keys():
+                    self.assertTrue(key in actual_outcome.get(category, dict()).keys())
+                    self.assertEqual(expected_outcome.get(category, dict()).get(key),
+                                     actual_outcome.get(category, dict()).get(key))
+
+        self.db.session_maker.assert_called_with()
+        query.assert_has_calls([
+            call(invocado.db.models.TerraformFolder),
+            call().all(),
+            call(invocado.db.models.TerraformVLAN),
+            call().all(),
+        ])
+        self.db.session_maker.return_value.close.assert_called_with()
+
+    def test_get_mac_mappings_no_vlans(self):
+        """
+        If no VLANs exist, a Default one is thrown into this.
+        The creation functionality will not try to add a VLAN if it's invalid
+        """
+        self.db.get_config = MagicMock()
+        self.db.get_config.return_value = 'VVFFFFFFFFII'
+        query = self.db.session_maker.return_value.query
+        db_folders = [
+            invocado.db.models.TerraformFolder(id=0, path='one'),
+            invocado.db.models.TerraformFolder(id=730480392, path='two'),  # id: 0x2B8A3F08
+        ]
+        db_vlans = [
         ]
 
-        actual_outcomes = self.db.get_mac_mappings()
+        query.return_value.all.side_effect = [
+            db_folders,
+            db_vlans,
+        ]
 
-        self.assertEqual(len(expected_outcomes), len(actual_outcomes))
+        expected_outcome = {
+            'macs': [
+                'FF:00:00:00:00:FF',
+                'FF:2B:8A:3F:08:FF',
+            ],
+            'folders': {
+                0: 'one',
+                730480392: 'two',
+            },
+            'vlans': {
+                255: 'Default',
+            },
+        }
 
-        for outcome in expected_outcomes:
-            self.assertTrue(outcome in actual_outcomes)
+        actual_outcome = self.db.get_mac_mappings()
+
+        self.assertEqual(len(expected_outcome), len(actual_outcome))
+        self.assertEqual(len(expected_outcome.get('macs')), len(actual_outcome.get('macs')))
+        self.assertEqual(len(expected_outcome.get('folders')), len(actual_outcome.get('folders')))
+        self.assertEqual(len(expected_outcome.get('vlans')), len(actual_outcome.get('vlans')))
+
+        for category in expected_outcome.keys():
+            self.assertTrue(category in actual_outcome.keys())
+            if type(expected_outcome.get(category)) == list:
+                for item in expected_outcome.get(category):
+                    self.assertTrue(item in actual_outcome.get(category))
+            elif type(expected_outcome.get(category)) == dict:
+                for key in expected_outcome.get(category, dict()).keys():
+                    self.assertTrue(key in actual_outcome.get(category, dict()).keys())
+                    self.assertEqual(expected_outcome.get(category, dict()).get(key),
+                                     actual_outcome.get(category, dict()).get(key))
+
+        self.db.session_maker.assert_called_with()
+        query.assert_has_calls([
+            call(invocado.db.models.TerraformFolder),
+            call().all(),
+            call(invocado.db.models.TerraformVLAN),
+            call().all(),
+        ])
+        self.db.session_maker.return_value.close.assert_called_with()
+
+    def test_get_mac_mappings_no_vlans_2(self):
+        """
+        If no VLANs exist, a Default one is thrown into this.
+        The creation functionality will not try to add a VLAN if it's invalid
+        """
+        self.db.get_config = MagicMock()
+        self.db.get_config.return_value = 'VVVVVVFFFFII'
+        query = self.db.session_maker.return_value.query
+        db_folders = [
+            invocado.db.models.TerraformFolder(id=0, path='one'),
+            invocado.db.models.TerraformFolder(id=10, path='two'),  # id: 0x0A
+        ]
+        db_vlans = [
+        ]
+
+        query.return_value.all.side_effect = [
+            db_folders,
+            db_vlans,
+        ]
+
+        expected_outcome = {
+            'macs': [
+                'FF:FF:FF:00:00:FF',
+                'FF:FF:FF:00:0A:FF',
+            ],
+            'folders': {
+                0: 'one',
+                10: 'two',
+            },
+            'vlans': {
+                16777215: 'Default',
+            },
+        }
+
+        actual_outcome = self.db.get_mac_mappings()
+
+        self.assertEqual(len(expected_outcome), len(actual_outcome))
+        self.assertEqual(len(expected_outcome.get('macs')), len(actual_outcome.get('macs')))
+        self.assertEqual(len(expected_outcome.get('folders')), len(actual_outcome.get('folders')))
+        self.assertEqual(len(expected_outcome.get('vlans')), len(actual_outcome.get('vlans')))
+
+        for category in expected_outcome.keys():
+            self.assertTrue(category in actual_outcome.keys())
+            if type(expected_outcome.get(category)) == list:
+                for item in expected_outcome.get(category):
+                    self.assertTrue(item in actual_outcome.get(category))
+            elif type(expected_outcome.get(category)) == dict:
+                for key in expected_outcome.get(category, dict()).keys():
+                    self.assertTrue(key in actual_outcome.get(category, dict()).keys())
+                    self.assertEqual(expected_outcome.get(category, dict()).get(key),
+                                     actual_outcome.get(category, dict()).get(key))
 
         self.db.session_maker.assert_called_with()
         query.assert_has_calls([
@@ -253,40 +417,83 @@ class DbTestClass(unittest.TestCase):
         self.db.get_config = MagicMock()
         self.db.get_config.return_value = 'FFFFVVVVIIII'
         self.db.get_mac_mappings = MagicMock()
-        self.db.get_mac_mappings.return_value = [
-            '00:11:22:33:44:55',
-            '00:00:00:00:00:00',
-            'AA:BB:CC:DD:EE:FF'
-        ]
+        self.db.get_mac_mappings.return_value = {
+            'macs': [
+                '00:11:22:33:44:55',
+                '00:00:00:00:00:00',
+                'AA:BB:CC:DD:EE:FF',
+            ],
+            'folders': {
+                0: 'one',
+                1: 'zebras',
+                2: 'apples',
+            },
+            'vlans': {
+                0: 'myVLAN',
+                1: 'myOtherVLAN',
+                2: 'anotherVLAN',
+            }
+        }
 
         self.db.utils.decode_mac.side_effect = [
             {
                 'mac': '00:11:22:33:44:55',
-                'vlan': 'myVLAN',
-                'folder': 'zebras'
+                'vlan': 0,
+                'folder': 1,
             },
             {
                 'mac': '00:00:00:00:00:00',
-                'vlan': 'myOtherVLAN',
-                'folder': 'one'
+                'vlan': 1,
+                'folder': 0,
             },
             {
                 'mac': 'AA:BB:CC:DD:EE:FF',
-                'vlan': 'anotherVLAN',
-                'folder': 'apples'
+                'vlan': 2,
+                'folder': 2,
             }
         ]
 
         expected_data = [
-                ['00:00:00:00:00:00', 'myOtherVLAN', 'one'],
-                ['00:11:22:33:44:55', 'myVLAN', 'zebras'],
-                ['AA:BB:CC:DD:EE:FF', 'anotherVLAN', 'apples'],
+                ['00:00:00:00:00:00', 'myOtherVLAN (1)', 'one (0)'],
+                ['00:11:22:33:44:55', 'myVLAN (0)', 'zebras (1)'],
+                ['AA:BB:CC:DD:EE:FF', 'anotherVLAN (2)', 'apples (2)'],
         ]
 
         self.db.print_mac_mappings()
 
-        mock_tabulate.assert_called_with(expected_data, headers=['MAC', 'VLAN', 'TF Config'])
+        mock_tabulate.assert_called_with(expected_data, headers=['MAC', 'VLAN', 'Terraform Folder'])
         mock_print.assert_called_with('tabulate_output')
+
+    @patch('pathlib.Path')
+    def test_prune_terraform_folders(self, mock_path):
+        folders = [
+            invocado.db.models.TerraformFolder(path='one'),
+            invocado.db.models.TerraformFolder(path='two'),
+            invocado.db.models.TerraformFolder(path='three'),
+            invocado.db.models.TerraformFolder(path='four'),
+            invocado.db.models.TerraformFolder(path='five'),
+        ]
+
+        self.db.terraform_dir = '/tmp/terraform'
+        query = self.db.session_maker.return_value.query
+        query.return_value.all.return_value = folders
+        mock_path.return_value.__truediv__.return_value.__truediv__.return_value.exists.side_effect = [
+            True,
+            False,
+            True,
+            False,
+            False,
+        ]
+
+        self.db.prune_terraform_folders()
+
+        self.db.session_maker.return_value.delete.assert_has_calls([
+            call(folders[1]),
+            call(folders[3]),
+            call(folders[4]),
+        ])
+        self.db.session_maker.return_value.commit.assert_called_with()
+        self.db.session_maker.return_value.close.assert_called_with()
 
     def test_set_config(self):
         config = invocado.db.models.Config()

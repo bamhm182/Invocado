@@ -19,7 +19,8 @@ class Db(Plugin):
             setattr(self,
                     plugin.lower(),
                     self.registry.get(plugin)(self.state))
-        self.session_maker = self.establish_db()
+
+        self.session_maker = kwargs.get('establish_db', self.establish_db)()
 
     @staticmethod
     def _fk_pragma_on_connect(dbapi_con, con_record):
@@ -30,7 +31,7 @@ class Db(Plugin):
 
         session = self.session_maker()
         for folder in folders:
-            db_folder = TerraformFolder(path=folder['path'])
+            db_folder = TerraformFolder(path=folder)
             session.add(db_folder)
         session.commit()
         session.close()
@@ -75,6 +76,9 @@ class Db(Plugin):
         vlans_length = self.wol_mac_mapping.count('V')
         instances_length = self.wol_mac_mapping.count('I')
 
+        if len(vlans) == 0:
+            vlans = [TerraformVLAN(id=int('F'*vlans_length, 16), name='Default')]
+
         squashed_mapping = ''.join(c for c, _ in itertools.groupby(self.wol_mac_mapping))
         squashed_mapping = squashed_mapping.replace('F', '__FOLDER__')
         squashed_mapping = squashed_mapping.replace('V', '__VLAN__')
@@ -90,12 +94,22 @@ class Db(Plugin):
                 current_mac = current_mac.replace('__INSTANCE__', instance_hex)
                 macs.append(current_mac)
 
-        returned_macs = set()
+        returns = {
+            'macs': set(),
+            'folders': dict(),
+            'vlans': dict(),
+        }
 
         for mac in macs:
-            returned_macs.add(':'.join([mac[i:i+2] for i in range(0, len(mac), 2)]))
+            returns['macs'].add(':'.join([mac[i:i+2] for i in range(0, len(mac), 2)]))
 
-        return returned_macs
+        for folder in folders:
+            returns['folders'][folder.id] = folder.path
+
+        for vlan in vlans:
+            returns['vlans'][vlan.id] = vlan.name
+
+        return returns
 
     @property
     def guacamole_authtoken(self) -> str:
@@ -149,19 +163,34 @@ class Db(Plugin):
     def print_mac_mappings(self):
         data = list()
         wol_mac_mapping = self.wol_mac_mapping
-        for mac in self.get_mac_mappings():
-            print(mac)
+        mappings = self.get_mac_mappings()
+        for mac in mappings.get('macs'):
             definition = self.utils.decode_mac(mac, wol_mac_mapping)
             if definition:
                 data.append([
                     definition['mac'],
-                    definition['vlan'],
-                    definition['folder']
+                    f'{mappings.get("vlans", dict()).get(definition["vlan"])} ({definition["vlan"]})',
+                    f'{mappings.get("folders", dict()).get(definition["folder"])} ({definition["folder"]})',
                 ])
 
         data.sort(key=lambda x: x[0])
 
-        print(tabulate(data, headers=['MAC', 'VLAN', 'TF Config']))
+        wol_mac_mapping = self.wol_mac_mapping
+
+        print('Your WoL MAC Mapping is ' +
+              ':'.join([wol_mac_mapping[i:i+2] for i in range(0, len(wol_mac_mapping), 2)]))
+        print('  F: Folder\n  V: VLAN\n  I: Instance\n')
+        print(tabulate(data, headers=['MAC', 'VLAN', 'Terraform Folder']))
+
+    def prune_terraform_folders(self):
+        session = self.session_maker()
+        folders = session.query(TerraformFolder).all()
+        tf_dir = pathlib.Path(self.terraform_dir)
+        for folder in folders:
+            if not (tf_dir / folder.path / 'main.tf').exists():
+                session.delete(folder)
+        session.commit()
+        session.close()
 
     def set_config(self, name, value):
         session = self.session_maker()
@@ -178,7 +207,7 @@ class Db(Plugin):
         query = session.query(TerraformFolder)
         ret = list()
         for folder in folders:
-            db_folder = query.filter_by(path=folder.get('path')).first()
+            db_folder = query.filter_by(path=folder).first()
             if not db_folder:
                 ret.append(folder)
         session.close()

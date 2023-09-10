@@ -15,19 +15,13 @@ class Terraform(Plugin):
 
     def add_configs_to_db(self) -> None:
         configs = glob.glob(str(self.db.terraform_dir) + '/**/main.tf', recursive=True)
-        to_add = list()
+        to_add = set()
         for config in configs:
             config = config.replace(str(self.db.terraform_dir), '')
             config = config.replace('/main.tf', '')
             config = config.strip('/')
-            to_add.append({
-                'kind': 'F',
-                'description': config
-            })
-        to_add = [dict(t) for t in {tuple(d.items()) for d in to_add}]
-        to_add.sort(key=lambda x: x['description'])
-        print(to_add)
-        self.db.add_mac_mapping(to_add)
+            to_add.add(config)
+        self.db.add_tf_folders(sorted(to_add))
 
     def clone_repo(self, reset: bool = True) -> None:
         if self.db.terraform_repo in [None, '']:

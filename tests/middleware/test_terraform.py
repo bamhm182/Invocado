@@ -21,8 +21,27 @@ class TerraformTestClass(unittest.TestCase):
         self.terraform = invocado.plugins.Terraform(self.state)
         self.terraform.db = MagicMock()
 
-    def test_add_configs_to_db(self):
-        pass
+    @patch('glob.glob')
+    def test_add_configs_to_db(self, mock_glob):
+        self.terraform.db.terraform_dir = '/tmp/terraform'
+        mock_glob.return_value = [
+            '/tmp/terraform/one/main.tf',
+            '/tmp/terraform/two/main.tf',
+            '/tmp/terraform/three/zebra/main.tf',
+            '/tmp/terraform/three/apple/main.tf',
+            '/tmp/terraform/three/taco/main.tf',
+        ]
+        expected_adds = [
+            'one',
+            'three/apple',
+            'three/taco',
+            'three/zebra',
+            'two',
+        ]
+
+        self.terraform.add_configs_to_db()
+
+        self.terraform.db.add_tf_folders.assert_called_with(expected_adds)
 
     @patch('shutil.rmtree')
     @patch('git.Repo')
